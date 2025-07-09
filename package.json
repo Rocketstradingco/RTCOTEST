@@ -1,0 +1,22 @@
+{
+  "name": "rtco-super-admin-bot",
+  "version": "9.0.0",
+  "description": "A full-featured admin dashboard and Discord bot with multi-seller support and advanced Browse.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "discord",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.7.5"
+  }
+}
