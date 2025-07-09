@@ -28,4 +28,16 @@ module.exports = {
         await saveClaims(claims);
         return newClaim;
     },
-};
+    // Function to remove a claim based on user and card
+    removeClaim: async (userId, cardId) => {
+        const claims = await getClaims();
+        const index = claims.findIndex(
+            c => c.userId === userId && c.cardId === cardId
+        );
+        if (index === -1) {
+            throw new Error('Claim not found.');
+        }
+        claims.splice(index, 1);
+        await saveClaims(claims);
+        return true;
+    },};

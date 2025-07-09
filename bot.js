@@ -10,6 +10,7 @@ const postManager = require('./postManager'); // Import postManager
 const ADMIN_USER_IDS = ['1289695143598751889'];
 const BOT_PREFIX = '!';
 const interactiveSetups = new Map();
+const categorySessions = new Map();
 
 const client = new Client({
     intents: [ GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessages, GatewayIntentBits.GuildMessageReactions ], // Added GuildMessageReactions for button interactions
@@ -131,6 +132,19 @@ client.on('messageCreate', async (msg) => {
             } catch (error) { msg.reply(`❌ **Error:** ${error.message}`); }
             break;
 
+        case 'postcategory': {
+            if (!userIsAdmin) return msg.reply('This is an admin-only command.');
+            const [postCategory, channelIdArg] = args;
+            if (!postCategory) return msg.reply('**Usage:** `!postcategory <Category> [Channel_ID]`');
+            const targetChannelId = channelIdArg || msg.channel.id;
+            try {
+                const postedId = await sendCategoryPost(postCategory, targetChannelId);
+                msg.reply(`Category post sent with message ID \`${postedId}\`.`);
+            } catch (error) {
+                msg.reply(`❌ **Error:** ${error.message}`);
+            }
+            break; }
+
         case 'rtcohelp':
             const helpEmbed = new EmbedBuilder().setColor('#b91c1c').setTitle('RTCO Bot Command List');
             const fields = [
@@ -141,7 +155,7 @@ client.on('messageCreate', async (msg) => {
                 fields.push({ name: '--- Seller Commands ---', value: '`!myinfo` (seller info)\n`!addcard` (add card)' });
             }
             if (userIsAdmin) {
-                fields.push({ name: '--- Admin Commands ---', value: '`!delcard <ID>` (delete card)' });
+                fields.push({ name: '--- Admin Commands ---', value: '`!delcard <ID>` (delete card)\n`!postcategory <Category> [Channel_ID]` (post category embed)' });
             }
             helpEmbed.addFields(fields);
             return msg.channel.send({ embeds: [helpEmbed] });
@@ -179,26 +193,20 @@ client.on('interactionCreate', async (interaction) => {
 
     // Handle Button interactions
     if (interaction.isButton()) {
-        const [action, cardId] = interaction.customId.split('_'); // e.g., ['claim', 'card_123']
-
-        if (!cardId) {
-            await interaction.reply({ content: 'Error: Invalid button action.', ephemeral: true });
-            return;
-        }
+        const [action, value] = interaction.customId.split('_');
 
         const cards = await cardManager.getCards();
-        const card = cards.find(c => c.id === cardId);
-
-        if (!card) {
-            await interaction.reply({ content: 'Error: Card not found.', ephemeral: true });
-            return;
-        }
+        const card = cards.find(c => c.id === value);
 
         switch (action) {
             case 'claim':
+                if (!card) {
+                    await interaction.reply({ content: 'Error: Card not found.', ephemeral: true });
+                    return;
+                }
                 // Check if already claimed by someone else
                 const existingClaims = await claimManager.getClaims();
-                const alreadyClaimed = existingClaims.some(c => c.cardId === cardId);
+                const alreadyClaimed = existingClaims.some(c => c.cardId === value);
                 if (alreadyClaimed) {
                     await interaction.reply({ content: `❌ This item has already been claimed!`, ephemeral: true });
                     return;
@@ -242,13 +250,17 @@ client.on('interactionCreate', async (interaction) => {
                 break;
 
             case 'unclaim':
+                if (!card) {
+                    await interaction.reply({ content: 'Error: Card not found.', ephemeral: true });
+                    return;
+                }
                 // Check if claimed by this user
-                const claimsByThisUser = (await claimManager.getClaims()).filter(c => c.userId === interaction.user.id && c.cardId === cardId);
+                const claimsByThisUser = (await claimManager.getClaims()).filter(c => c.userId === interaction.user.id && c.cardId === value);
                 if (claimsByThisUser.length === 0) {
                     await interaction.reply({ content: `❌ You have not claimed this item.`, ephemeral: true });
                     return;
                 }
-                await claimManager.removeClaim(interaction.user.id, card.id); // Call new removeClaim
+                await claimManager.removeClaim(interaction.user.id, card.id);
                 await interaction.reply({ content: `✅ You have unclaimed **${card.name}**!`, ephemeral: true });
                 // Attempt to update the original message to reflect the unclaim
                 try {
@@ -262,7 +274,7 @@ client.on('interactionCreate', async (interaction) => {
                     const newComponents = originalMessage.components.map(row => {
                         return new ActionRowBuilder().addComponents(
                             row.components.map(button => {
-                                if (button.customId === `claim_${cardId}`) { // Re-enable the claim button
+                                if (button.customId === `claim_${value}`) { // Re-enable the claim button
                                     return ButtonBuilder.from(button).setDisabled(false).setLabel('Claim');
                                 }
                                 return ButtonBuilder.from(button);
@@ -274,6 +286,32 @@ client.on('interactionCreate', async (interaction) => {
                 } catch (error) {
                     console.error(`Error updating embed after unclaim: ${error.message}`);
                 }
+                break;
+
+            case 'refresh':
+                await sendCategoryPost(value, interaction.channelId, interaction.message.id);
+                await interaction.deferUpdate();
+                break;
+
+            case 'explore':
+                const isMobile = !!interaction.member?.presence?.clientStatus?.mobile;
+                await interaction.reply({ content: 'Loading...', ephemeral: true });
+                await sendCategoryPage(interaction, value, 0, isMobile ? 4 : 9);
+                break;
+
+            case 'catnext':
+            case 'catprev':
+            case 'catclose':
+                const sessionKey = `${interaction.user.id}_${value}`;
+                const session = categorySessions.get(sessionKey) || { page: 0, perPage: 9 };
+                if (action === 'catclose') {
+                    categorySessions.delete(sessionKey);
+                    await interaction.update({ content: 'Closed.', embeds: [], components: [] });
+                    break;
+                }
+                const newPage = action === 'catnext' ? session.page + 1 : session.page - 1;
+                await interaction.deferUpdate();
+                await sendCategoryPage(interaction, value, newPage, session.perPage);
                 break;
 
             default:
@@ -513,6 +551,7 @@ async function sendCategoryPost(category, channelId, existingMessageId = null) {
 
     const embedFields = [];
     const components = []; // To hold ActionRows for buttons
+    let coverImage = null;
 
     if (cardsInCategory.length > 0) {
         // Create a button row for each card (or group of cards if too many buttons)
@@ -520,6 +559,12 @@ async function sendCategoryPost(category, channelId, existingMessageId = null) {
         let currentActionRow = new ActionRowBuilder();
         let buttonCountInRow = 0;
         let totalButtonRows = 0;
+
+        coverImage = cardManager.getDiscordImageUrl(
+            cardsInCategory[0].frontImage.channelId,
+            cardsInCategory[0].frontImage.messageId,
+            cardsInCategory[0].frontImage.filename
+        );
 
         for (const card of cardsInCategory) {
             const isClaimed = existingClaims.some(claim => claim.cardId === card.id);
@@ -567,16 +612,31 @@ async function sendCategoryPost(category, channelId, existingMessageId = null) {
             totalButtonRows++;
         }
 
+        // Add Explore/Refresh buttons as final row
+        const exploreButton = new ButtonBuilder()
+            .setCustomId(`explore_${category}`)
+            .setLabel('Explore')
+            .setStyle(ButtonStyle.Primary);
+
+        const refreshButton = new ButtonBuilder()
+            .setCustomId(`refresh_${category}`)
+            .setLabel('Refresh')
+            .setStyle(ButtonStyle.Secondary);
+
+        components.push(new ActionRowBuilder().addComponents(exploreButton, refreshButton));
+
     } else {
         embedFields.push({ name: 'No Items', value: 'No items currently in this category.', inline: false });
     }
 
     const embed = new EmbedBuilder()
-        .setColor('#0099ff') // A nice blue color
+        .setColor('#0099ff')
         .setTitle(`Category: ${category} Items`)
         .setTimestamp()
         .setFooter({ text: 'RTCO Bot' })
-        .addFields(embedFields); // Use addFields for multiple fields
+        .addFields(embedFields);
+
+    if (coverImage) embed.setImage(coverImage);
 
     let sentMessage;
     if (existingMessageId) {
@@ -592,6 +652,37 @@ async function sendCategoryPost(category, channelId, existingMessageId = null) {
     }
 
     return sentMessage.id; // Return the ID of the sent or edited message
+}
+
+async function sendCategoryPage(interaction, category, page, perPage) {
+    const cards = await cardManager.getCardsByCategory(category);
+    const totalPages = Math.max(1, Math.ceil(cards.length / perPage));
+    const normalizedPage = ((page % totalPages) + totalPages) % totalPages;
+    const start = normalizedPage * perPage;
+    const pageCards = cards.slice(start, start + perPage);
+
+    const embed = new EmbedBuilder()
+        .setColor('#0099ff')
+        .setTitle(`Browse ${category} (${normalizedPage + 1}/${totalPages})`)
+        .setDescription(pageCards.map(c => `**${c.name}**` ).join('\n'));
+
+    if (pageCards[0]) {
+        const url = cardManager.getDiscordImageUrl(
+            pageCards[0].frontImage.channelId,
+            pageCards[0].frontImage.messageId,
+            pageCards[0].frontImage.filename
+        );
+        embed.setImage(url);
+    }
+
+    const left = new ButtonBuilder().setCustomId(`catprev_${category}`).setLabel('←').setStyle(ButtonStyle.Secondary);
+    const close = new ButtonBuilder().setCustomId(`catclose_${category}`).setLabel('Back').setStyle(ButtonStyle.Danger);
+    const right = new ButtonBuilder().setCustomId(`catnext_${category}`).setLabel('→').setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder().addComponents(left, close, right);
+
+    await interaction.editReply({ embeds: [embed], components: [row] });
+    categorySessions.set(`${interaction.user.id}_${category}`, { page: normalizedPage, perPage });
 }
 
 
@@ -624,6 +715,7 @@ module.exports = {
     },
     sendMessageToChannel,
     sendCategoryPost,
+    sendCategoryPage,
     searchChannels, // Export the new search function
     uploadImageToChannel // Export the new image upload function
 };
