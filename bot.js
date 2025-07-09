@@ -1,24 +1,6 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Events, EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
-
-function loadData(file, fallback) {
-  const filePath = path.join(DATA_DIR, file);
-  if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath));
-  return fallback;
-}
-function saveData(file, data) {
-  const filePath = path.join(DATA_DIR, file);
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
-
-let sellers = loadData('sellers.json', {});
-let items = loadData('items.json', {});
-let claims = loadData('claims.json', []);
+const { Client, GatewayIntentBits, Partials, Events, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const { store, save } = require('./dataStore');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent], partials: [Partials.Channel] });
 
@@ -32,39 +14,45 @@ client.on(Events.MessageCreate, async message => {
   const command = args.shift()?.toLowerCase();
 
   if (command === '!setup') {
-    sellers[message.author.id] = { id: message.author.id };
-    saveData('sellers.json', sellers);
+    store.sellers[message.author.id] = { id: message.author.id };
+    save();
     return message.reply('You are now registered as a seller.');
   }
 
   if (command === '!additem') {
-    if (!sellers[message.author.id]) return message.reply('Use !setup to register first.');
+    if (!store.sellers[message.author.id]) return message.reply('Use !setup to register first.');
     const [category, price, name, ...desc] = args;
     if (!category || !price || !name) return message.reply('Usage: !additem <category> <price> <name> [description]');
-    if (!items[category]) items[category] = [];
+    if (!store.items[category]) store.items[category] = [];
     const item = { id: Date.now(), seller: message.author.id, category, price: parseFloat(price), name, description: desc.join(' ') };
-    items[category].push(item);
-    saveData('items.json', items);
+    store.items[category].push(item);
+    save();
     return message.reply(`Added item ${name} in ${category}.`);
   }
 
   if (command === '!list') {
     const category = args[0];
-    if (!category || !items[category]) return message.reply('Category not found.');
-    const embed = new EmbedBuilder().setTitle(`Items in ${category}`);
-    for (const it of items[category]) {
+    if (!category || !store.items[category]) return message.reply('Category not found.');
+    const embed = new EmbedBuilder().setColor(store.settings.embedColor).setTitle(`Items in ${category}`);
+    for (const it of store.items[category]) {
       embed.addFields({ name: `${it.id}: ${it.name} - $${it.price}`, value: it.description || 'No description', inline: false });
     }
     return message.reply({ embeds: [embed] });
   }
 
+  if (command === '!categories') {
+    const list = Object.keys(store.items);
+    if (!list.length) return message.reply('No categories.');
+    return message.reply('Categories: ' + list.join(', '));
+  }
+
   if (command === '!claim') {
     const id = parseInt(args[0], 10);
-    for (const cat of Object.keys(items)) {
-      const found = items[cat].find(i => i.id === id);
+    for (const cat of Object.keys(store.items)) {
+      const found = store.items[cat].find(i => i.id === id);
       if (found) {
-        claims.push({ id, claimer: message.author.id, seller: found.seller, price: found.price });
-        saveData('claims.json', claims);
+        store.claims.push({ id, claimer: message.author.id, seller: found.seller, price: found.price });
+        save();
         return message.reply(`Claimed item ${id}.`);
       }
     }
@@ -72,13 +60,17 @@ client.on(Events.MessageCreate, async message => {
   }
 
   if (command === '!claims') {
-    const userClaims = claims.filter(c => c.claimer === message.author.id);
+    const userClaims = store.claims.filter(c => c.claimer === message.author.id);
     if (!userClaims.length) return message.reply('No claims.');
-    const embed = new EmbedBuilder().setTitle('Your Claims');
+    const embed = new EmbedBuilder().setColor(store.settings.embedColor).setTitle('Your Claims');
     for (const c of userClaims) {
       embed.addFields({ name: `Item ${c.id}`, value: `Seller <@${c.seller}> - $${c.price}` });
     }
     return message.reply({ embeds: [embed] });
+  }
+
+  if (command === '!help') {
+    return message.reply('Commands: !setup, !additem, !list <category>, !categories, !claim <id>, !claims');
   }
 });
 

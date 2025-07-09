@@ -1,10 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+const { store, save } = require('./dataStore');
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -12,19 +8,6 @@ app.use(express.json());
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change_me';
 const PORT = process.env.PORT || 3000;
-
-function loadData(file, fallback) {
-  const filePath = path.join(DATA_DIR, file);
-  if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath));
-  return fallback;
-}
-function saveData(file, data) {
-  const filePath = path.join(DATA_DIR, file);
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
-
-let items = loadData('items.json', {});
-let sellers = loadData('sellers.json', {});
 
 function auth(req, res, next) {
   if (req.query.password !== ADMIN_PASSWORD) return res.status(401).send('Unauthorized');
@@ -56,17 +39,17 @@ app.get('/admin', auth, (req, res) => {
 app.post('/admin/add-category', auth, (req, res) => {
   const { category } = req.body;
   if (!category) return res.status(400).send('Category required');
-  if (!items[category]) items[category] = [];
-  saveData('items.json', items);
+  if (!store.items[category]) store.items[category] = [];
+  save();
   res.send('Category added');
 });
 
 app.post('/admin/add-item', auth, (req, res) => {
   const { category, name, description, price, image } = req.body;
   if (!category || !name) return res.status(400).send('Category and name required');
-  if (!items[category]) items[category] = [];
-  items[category].push({ id: Date.now(), name, description, price, image });
-  saveData('items.json', items);
+  if (!store.items[category]) store.items[category] = [];
+  store.items[category].push({ id: Date.now(), name, description, price, image });
+  save();
   res.send('Item added');
 });
 

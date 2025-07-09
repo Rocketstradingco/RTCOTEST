@@ -1,7 +1,8 @@
 # Discord Inventory Bot
 
-This repository contains a simple Discord bot together with a minimal web admin interface.
-It allows sellers to register themselves, add items to categories and let users claim items through Discord.
+This repository contains a Discord inventory bot with a small web admin interface.
+Sellers register through Discord, add items and categories and users claim those items.
+All data is kept in the `data/` folder and a `debug_dump.txt` file is automatically updated whenever changes occur.
 
 ## Setup
 1. Install dependencies
@@ -20,7 +21,9 @@ It allows sellers to register themselves, add items to categories and let users 
 - `!setup` - register yourself as a seller
 - `!additem <category> <price> <name> [description]` - add an item
 - `!list <category>` - list items in a category
+- `!categories` - show available categories
 - `!claim <id>` - claim an item
 - `!claims` - view your claims
+- `!help` - show commands
 
 This is only a minimal starting point and will need further work to become a fully featured inventory system.
