@@ -23,3 +23,7 @@ This project provides a small admin dashboard and Discord bot for managing selle
    ```
 
 The application will launch the Express dashboard and the Discord bot.
+
+## Additional Bot Commands
+
+- `!postcategory <Category> [Channel_ID]` – post or update a category embed with refresh/explore buttons
