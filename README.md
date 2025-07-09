@@ -1,29 +1,29 @@
-# RTCO Super Admin Bot
+# Discord Inventory Bot
 
-This project provides a small admin dashboard and Discord bot for managing sellers and trading cards. Data is persisted to local JSON files and served through an Express API.
+This repository contains a Discord inventory bot with a small web admin interface.
+Sellers register through Discord, add items and categories and users claim those items.
+All data is kept in the `data/` folder and a `debug_dump.txt` file is automatically updated whenever changes occur.
 
 ## Setup
-
-1. Install dependencies:
+1. Install dependencies
    ```bash
    npm install
    ```
-2. Create a `.env` file with your Discord credentials. The following variables are used:
-   - `DISCORD_TOKEN`
-   - `CLIENT_ID`
-   - `GUILD_ID`
-   - `DISCORD_POSTING_CHANNEL_ID`
-   - `DISCORD_TRACKING_CHANNEL_ID`
-   - `DISCORD_SHARED_IMAGE_DUMP_CHANNEL_ID`
-   - `JWT_SECRET`
-
-3. Start the server:
+2. Edit the `.env` file with your Discord bot token and other IDs.
+3. Start the bot and web server
    ```bash
-   npm start
+   node bot.js &
+   node server.js
    ```
+4. Visit `http://localhost:3000/admin?password=YOURPASSWORD` to manage categories and items.
 
-The application will launch the Express dashboard and the Discord bot.
+## Basic Commands
+- `!setup` - register yourself as a seller
+- `!additem <category> <price> <name> [description]` - add an item
+- `!list <category>` - list items in a category
+- `!categories` - show available categories
+- `!claim <id>` - claim an item
+- `!claims` - view your claims
+- `!help` - show commands
 
-## Additional Bot Commands
-
-- `!postcategory <Category> [Channel_ID]` – post or update a category embed with refresh/explore buttons
+This is only a minimal starting point and will need further work to become a fully featured inventory system.
