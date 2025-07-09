@@ -3,14 +3,21 @@
 [1/5] CARDS:
 [
   {
-    "id": "card_1752014318779",
-    "name": "",
-    "description": "",
-    "price": 56,
-    "category": "pokemon 1",
+    "id": "card_1752022100232",
+    "name": "1",
+    "price": 23,
+    "category": "pokemon",
     "sellerId": "seller_1752013259553",
-    "frontImage": {},
-    "backImage": {}
+    "frontImage": {
+      "channelId": "1391566096842227785",
+      "messageId": "1392306330882015284",
+      "filename": "1_20250707211914.jpg"
+    },
+    "backImage": {
+      "channelId": "1391566096842227785",
+      "messageId": "1392306364684042353",
+      "filename": "1_20250707211736.jpg"
+    }
   }
 ]
 
@@ -50,6 +57,11 @@
     "category": "pokemon",
     "channelId": "1316432827662995527",
     "messageId": "1392273465389748290"
+  },
+  {
+    "category": "pokemon",
+    "channelId": "1384726848277053521",
+    "messageId": "1392306580661469348"
   }
 ]
 

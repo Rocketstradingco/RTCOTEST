@@ -15,5 +15,22 @@
       "messageId": "1392306364684042353",
       "filename": "1_20250707211736.jpg"
     }
+  },
+  {
+    "id": "card_1752024805583",
+    "name": "bill",
+    "price": 23,
+    "category": "pokemon",
+    "sellerId": "seller_1752013259553",
+    "frontImage": {
+      "channelId": "1391566096842227785",
+      "messageId": "1392317682816258088",
+      "filename": "1_20250707211654.jpg"
+    },
+    "backImage": {
+      "channelId": "1391566096842227785",
+      "messageId": "1392317711438188705",
+      "filename": "1_20250707211839.jpg"
+    }
   }
 ]
