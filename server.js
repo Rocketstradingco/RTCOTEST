@@ -4,6 +4,7 @@ const { Server } = require("socket.io");
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs/promises');
+const logger = require('./logger');
 
 // Manager and Bot imports
 const cardManager = require('./cardManager');
@@ -19,6 +20,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const PORT = process.env.PORT || 3000;
+logger.init();
 
 // Multer setup for handling file uploads in memory
 const storage = multer.memoryStorage();
@@ -246,6 +248,18 @@ async function startServer() {
         console.error('Could not log in the Discord bot. Please verify your DISCORD_TOKEN.');
         console.error(`Error details: ${error.message}`);
     }
+
+    server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.error(`Port ${PORT} is in use. Trying a different port...`);
+            server.listen(0, () => {
+                const newPort = server.address().port;
+                console.log(`Super Admin Dashboard live on http://localhost:${newPort}`);
+            });
+        } else {
+            console.error('Server error:', err);
+        }
+    });
 
     server.listen(PORT, () => console.log(`Super Admin Dashboard live on http://localhost:${PORT}`));
 }
